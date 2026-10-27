@@ -1,0 +1,254 @@
+{
+  "name": "Miu",
+  "version": "0.4.0",
+  "canvas": [
+    1024,
+    1024
+  ],
+  "pivots": {
+    "root": [
+      475,
+      1010
+    ],
+    "head": [
+      481.28,
+      563.2
+    ],
+    "tail": [
+      730,
+      910
+    ],
+    "ear_L": [
+      145,
+      303
+    ],
+    "ear_R": [
+      846,
+      326
+    ],
+    "body": [
+      481.28,
+      1010
+    ],
+    "foreleg_L": [
+      355,
+      770
+    ],
+    "foreleg_R": [
+      587,
+      770
+    ],
+    "collar": [
+      475,
+      650
+    ],
+    "pendant": [
+      465,
+      641
+    ],
+    "eyes": [
+      475,
+      405
+    ],
+    "mouth": [
+      475,
+      495
+    ]
+  },
+  "assets": {
+    "head": {
+      "src": "assets/layers/head.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "body": {
+      "src": "assets/layers/body.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "ear_L": {
+      "src": "assets/layers/ear_L.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "ear_R": {
+      "src": "assets/layers/ear_R.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "tail": {
+      "src": "assets/layers/tail.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "foreleg_L": {
+      "src": "assets/layers/foreleg_L.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "foreleg_R": {
+      "src": "assets/layers/foreleg_R.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "collar": {
+      "src": "assets/layers/collar.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "pendant": {
+      "src": "assets/layers/pendant.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "brow_L": {
+      "src": "assets/layers/brow_L.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "brow_R": {
+      "src": "assets/layers/brow_R.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "nose": {
+      "src": "assets/layers/nose.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "mouth_smile": {
+      "src": "assets/layers/mouth_smile.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "blush_L": {
+      "src": "assets/layers/blush_L.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "blush_R": {
+      "src": "assets/layers/blush_R.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "eye_white_L": {
+      "src": "assets/layers/eye_white_L.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "iris_L": {
+      "src": "assets/layers/iris_L.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "eye_white_R": {
+      "src": "assets/layers/eye_white_R.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "iris_R": {
+      "src": "assets/layers/iris_R.png",
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "shadow": {
+      "src": "assets/layers/shadow.png",
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "gazeLimit": [
+    4,
+    3
+  ],
+  "clips": {
+    "iris_L": "eye_white_L",
+    "iris_R": "eye_white_R"
+  },
+  "states": [
+    "idle",
+    "happy",
+    "love",
+    "star",
+    "dizzy",
+    "wink",
+    "singing",
+    "disco_dance"
+  ],
+  "previewAliases": {
+    "singing": "sing",
+    "disco_dance": "disco"
+  },
+  "headGroup": [
+    "ear_L",
+    "ear_R",
+    "head",
+    "blush_L",
+    "blush_R",
+    "eye_white_L",
+    "eye_white_R",
+    "iris_L",
+    "iris_R",
+    "brow_L",
+    "brow_R",
+    "nose",
+    "mouth_smile"
+  ],
+  "bodyGroup": [
+    "body",
+    "foreleg_L",
+    "foreleg_R",
+    "collar",
+    "pendant"
+  ],
+  "defaultStack": [
+    "shadow",
+    "tail",
+    "body",
+    "foreleg_L",
+    "foreleg_R",
+    "collar",
+    "headGroup",
+    "pendant"
+  ]
+}
