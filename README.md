@@ -1,30 +1,38 @@
 # Miu Lite 0.1.0
 
-Teman desktop portable untuk Windows 11, dengan karakter kucing Miu v0.4 dan chat Google Gemini.
+A portable Windows 11 desktop companion featuring Miu v0.4 and Google Gemini chat.
 
 ![Miu](public/miu-rig/assets/icon_256.png)
 
-## Unduh dan jalankan
+## Download and run
 
-Unduh ZIP portable dari [Releases](https://github.com/mend0an/miu-lite/releases), ekstrak ke folder yang dapat ditulis, lalu jalankan `MiuLite-0.1.0-portable.exe`. Windows memerlukan Microsoft Edge WebView2 Runtime. Build ini belum ditandatangani secara digital.
+1. Download [MiuLite-0.1.0-portable.zip](https://github.com/mend0an/miu-lite/releases/download/v0.1.0/MiuLite-0.1.0-portable.zip).
+2. Extract the ZIP into a writable folder. It contains the executable and license notices.
+3. Run **MiuLite-0.1.0-portable.exe** from the extracted folder.
 
-Klik kanan Miu → **Pengaturan**. Masukkan API key Gemini milikmu, muat daftar model, pilih model, lalu tes koneksi. Pemakaian API mengikuti kuota dan tarif penyedia akunmu. Jangan membagikan API key.
+The app requires Microsoft Edge WebView2 Runtime. This build is not digitally signed. You can verify the ZIP using [SHA256SUMS.txt](https://github.com/mend0an/miu-lite/releases/download/v0.1.0/SHA256SUMS.txt).
 
-- Klik tombol gelembung untuk membuka chat. Seret Miu untuk memindahkannya.
-- `Ctrl+Alt+D` menampilkan atau menyembunyikan widget. Menu tray juga menyediakan pengaturan dan keluar.
-- Ingatan dan percakapan disimpan lokal, dengan pilihan untuk menonaktifkan atau menghapusnya.
-- File yang dijatuhkan ke Miu disalin setelah konfirmasi, diperiksa dengan SHA-256, dan tidak menimpa file yang sudah ada.
-- Miu dapat bergoyang saat Spotify memutar musik. Gerakan dan nada sintetis dapat dimatikan di pengaturan.
+Right-click Miu and open **Pengaturan** (Settings). Enter your Gemini API key, load and select a model, then test the connection. API usage is subject to your provider's account limits and pricing. Keep your API key private.
 
-## Data dan koneksi
+- Click the speech bubble to open chat, or drag Miu around your screen.
+- Press `Ctrl+Alt+D` to show or hide the widget. The system tray menu also provides settings and an exit option.
+- Memories and conversations are stored locally and can be disabled or deleted.
+- Files dropped onto Miu are copied after confirmation, verified with SHA-256, and never overwrite existing files.
+- Miu can dance while Spotify is playing. Animation and synthesized sounds can be disabled in settings.
 
-Setelan, percakapan, ingatan, log, dan folder penampungan file berada di `MiuLite-data` di samping executable. Jika folder tersebut tidak dapat ditulis, aplikasi memakai folder `MiuLite` di AppData. API key disimpan terpisah di Windows Credential Manager dengan layanan `miu-lite`. Memindahkan aplikasi ke PC lain tidak membawa API key.
+## Technology
 
-Chat dan konteks ingatan yang diaktifkan dikirim ke endpoint Gemini yang dipilih pengguna. Ringkasan otomatis memakai satu panggilan Gemini tambahan setelah percakapan. Tidak ada telemetri. File yang dijatuhkan disalin lokal; isi file tidak otomatis diunggah ke Gemini.
+The desktop backend is written in **Rust** with **Tauri**. The interface and Miu's layered renderer use **TypeScript**, **HTML**, and **CSS**, built with **Vite**. Python scripts were used to prepare Miu's layered artwork.
 
-## Build dari source
+## Data and connections
 
-Prasyarat: Windows 11, Node.js/npm, Rust stable, Visual Studio C++ Build Tools dan Windows SDK, serta WebView2 Runtime.
+Settings, conversations, memories, logs, and dropped files are stored in `MiuLite-data` next to the executable. If that folder is not writable, the app uses a `MiuLite` folder in AppData. The API key is stored separately in Windows Credential Manager under the `miu-lite` service and does not move with the app to another PC.
+
+Chat and enabled memory context are sent to the user-selected Gemini endpoint. Automatic summaries use one additional Gemini request after a conversation. There is no telemetry. Dropped files are copied locally; their contents are not automatically uploaded to Gemini.
+
+## Build from source
+
+Requirements: Windows 11, Node.js/npm, stable Rust, Visual Studio C++ Build Tools and Windows SDK, and WebView2 Runtime.
 
 ```powershell
 npm ci
@@ -33,12 +41,12 @@ cargo test --locked
 npm run pack
 ```
 
-Hasil: `release/MiuLite-0.1.0-portable.exe`. `npm run icons` membuat ulang ikon dari layer kepala Miu. Untuk pengembangan gunakan `npm run tauri dev`; halaman browser saja tidak menyediakan layanan native.
+The executable is written to `release/MiuLite-0.1.0-portable.exe`; the portable ZIP and checksum are created in the same folder. `npm run icons` regenerates the icons from Miu's head layers. Use `npm run tauri dev` for development; the browser-only page does not provide native services.
 
-Pemeriksaan paket: `npm run check:release`. Pengujian renderer: jalankan `npm run dev`, lalu buka `http://127.0.0.1:1420/dev/miu-check.html`; hasil harus `PASS`. Pengujian nada: `/dev/sound-check.html`, lalu tekan **Uji suara**.
+Run `npm run check:release` to check the package. To test the renderer, run `npm run dev` and open `http://127.0.0.1:1420/dev/miu-check.html`; the result should be `PASS`. To test the synthesized sounds, open `/dev/sound-check.html` and click **Uji suara**.
 
-## Lisensi dan kredit
+## License and credits
 
-Kode berlisensi MIT; lihat [LICENSE](LICENSE) dan [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Kode turunan dari Coucou karya Louis Raillé tetap menyertakan pemberitahuan MIT aslinya. Miu Lite adalah proyek terpisah dan tidak menyiratkan dukungan dari penulis upstream.
+The code is licensed under MIT; see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Code derived from Coucou by Louis Raillé retains its original MIT notice. Miu Lite is a separate project and does not imply endorsement by the upstream author.
 
-Artwork Miu dan ikon turunannya memiliki ketentuan terpisah di [LICENSE-ASSETS.md](LICENSE-ASSETS.md). Suara aplikasi berupa nada osilator yang dibuat dalam kode; tidak ada rekaman audio pihak lain di paket ini. Hak atas dependensi tetap mengikuti lisensi masing-masing.
+The Miu artwork and derived icons have separate terms in [LICENSE-ASSETS.md](LICENSE-ASSETS.md). Application sounds are oscillator tones generated in code; no third-party audio recordings are bundled. Dependencies retain their respective licenses.
