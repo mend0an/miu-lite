@@ -1,0 +1,545 @@
+/* The widget window is fully transparent: only the character, the status pill
+   and the panel are drawn. Sizes are CSS px = Windows logical px. */
+
+:root {
+  --bg: rgba(14, 15, 18, 0.97);
+  --bg-raised: #1b1d23;
+  --line: rgba(255, 255, 255, 0.09);
+  --text: #f3f4f6;
+  --muted: #9aa1ad;
+  --accent: #2f7bff;
+  --accent-soft: rgba(47, 123, 255, 0.16);
+  --danger: #f4505e;
+  --warn: #f5a524;
+  --ok: #34d399;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#root {
+  position: fixed;
+  inset: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ── Character ───────────────────────────────────────────────────────────── */
+
+/* Placed by widget.ts (left/top), anywhere in the window. */
+.char-wrap {
+  position: absolute;
+  line-height: 0;
+}
+
+.character {
+  display: block;
+  cursor: grab;
+}
+
+.character.dragging {
+  cursor: grabbing;
+}
+
+/* ── Status pill ─────────────────────────────────────────────────────────── */
+
+.status {
+  position: absolute;
+  display: none;
+  align-items: center;
+  gap: 7px;
+  max-width: 220px;
+  padding: 6px 12px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.status.on {
+  display: inline-flex;
+}
+
+.status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ── Chat bubble button ──────────────────────────────────────────────────── */
+
+.chat-bubble {
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: scale(0.6);
+  pointer-events: none;
+  transition: opacity 140ms ease-out, transform 160ms ease-out;
+}
+
+.chat-bubble.on {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.chat-bubble:hover {
+  background: #4b8dff;
+}
+
+/* ── Right-click menu ────────────────────────────────────────────────────── */
+
+.menu {
+  position: absolute;
+  display: none;
+  min-width: 168px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+.menu.on {
+  display: flex;
+  flex-direction: column;
+}
+
+.menu button {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font-size: 12.5px;
+}
+
+.menu button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.menu hr {
+  width: 100%;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-bubble {
+    transition: none;
+  }
+}
+
+/* ── Panel ───────────────────────────────────────────────────────────────── */
+
+.panel {
+  position: absolute;
+  width: 348px;
+  display: none;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--bg);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  animation: panel-in 160ms ease-out;
+}
+
+.panel.on {
+  display: flex;
+}
+
+/* Resize grip: just outside the panel's free corner (placeGrip in widget.ts). */
+.panel-grip {
+  position: absolute;
+  z-index: 3;
+  display: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background:
+    repeating-linear-gradient(var(--grip-angle, 45deg), transparent 0 3px, var(--muted) 3px 4px) center / 8px 8px no-repeat,
+    var(--bg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  opacity: 0.75;
+  touch-action: none;
+  transition: opacity 120ms, transform 120ms;
+}
+
+.panel-grip.on {
+  display: block;
+}
+
+.panel-grip:hover,
+body.resizing-chat .panel-grip {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.panel-grip[data-corner="tl"],
+.panel-grip[data-corner="br"] {
+  --grip-angle: 45deg;
+  cursor: nwse-resize;
+}
+
+.panel-grip[data-corner="tr"],
+.panel-grip[data-corner="bl"] {
+  --grip-angle: -45deg;
+  cursor: nesw-resize;
+}
+
+/* While resizing: the same cursor everywhere, and no text gets selected. */
+body.resizing-chat,
+body.resizing-chat * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+body.resizing-chat .panel {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-grip {
+    transition: none;
+  }
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}
+
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 10px 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.title-block {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: #8db6ff;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.subtitle {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.head-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.icon {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.icon:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+}
+
+.messages {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.messages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.messages::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+}
+
+.empty p {
+  margin: 0 0 8px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.bubble {
+  max-width: 88%;
+  padding: 8px 11px;
+  border-radius: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  background: var(--accent);
+  border-bottom-right-radius: 5px;
+}
+
+.bubble.model {
+  align-self: flex-start;
+  background: var(--bg-raised);
+  border-bottom-left-radius: 5px;
+}
+
+.bubble.model:empty::after {
+  content: "…";
+  color: var(--muted);
+}
+
+.note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* The model is saving or forgetting a fact. */
+.note.tool {
+  background: rgba(167, 139, 250, 0.12);
+  color: #d4c6ff;
+}
+
+.note.warn {
+  background: rgba(245, 165, 36, 0.12);
+  color: #fcd38a;
+}
+
+.note.err {
+  background: rgba(244, 80, 94, 0.13);
+  color: #ffb3ba;
+}
+
+.note button,
+.card-actions button {
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+}
+
+.note button:hover,
+.card-actions button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ── File card ───────────────────────────────────────────────────────────── */
+
+.card {
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-raised);
+}
+
+.card-title {
+  font-weight: 600;
+}
+
+.card-sub,
+.card-foot {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.file-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.file-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  font-size: 12px;
+}
+
+.file-list b {
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.file-list span {
+  color: var(--muted);
+}
+
+.file-list li.bad b,
+.file-list li.bad span {
+  color: #ffb3ba;
+}
+
+.file-list li.good b {
+  color: #a7f3d0;
+}
+
+.link {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #8db6ff;
+  font-size: 12px;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.card-actions button.primary {
+  border-color: transparent;
+  background: var(--accent);
+}
+
+.card-actions button.primary:hover {
+  background: #4b8dff;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── Composer ────────────────────────────────────────────────────────────── */
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.composer textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 110px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  outline: none;
+  resize: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.4;
+}
+
+.composer textarea:focus {
+  border-color: rgba(47, 123, 255, 0.6);
+}
+
+.send {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--accent);
+  font-size: 14px;
+}
+
+.send.stop {
+  background: var(--danger);
+}
