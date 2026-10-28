@@ -1,7 +1,7 @@
 {
   "name": "miu-lite",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "check:release": "node scripts/check-release.mjs",

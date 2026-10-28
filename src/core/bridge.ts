@@ -59,7 +59,7 @@ export interface ModelInfo {
 export interface ChatEvent {
   requestId: number;
   /** "tool": the model is using a memory tool; `text` says which, for the user. */
-  kind: "delta" | "tool" | "done" | "stopped" | "error";
+  kind: "delta" | "tool" | "search" | "suggestions" | "done" | "stopped" | "error";
   text: string;
   code: "key" | "model" | "ratelimit" | "network" | "blocked" | "server" | "other" | null;
 }
@@ -98,6 +98,7 @@ export const GEMINI_KEY = "gemini-api-key";
 export interface Turn {
   user: boolean;
   text: string;
+  suggestions?: string;
 }
 
 /** One fact Miu keeps about the user (memory.json). */
@@ -113,7 +114,7 @@ export interface Fact {
 }
 export const Bridge = {
   boot: () => call<BootInfo>("boot"),
-  saveSettings: (settings: Settings) => call<void>("save_settings", { settings }),
+  saveSettings: (settings: Settings) => IS_TAURI ? callOrThrow<void>("save_settings", { settings }) : Promise.resolve(),
 
   /** Shapes that take the mouse; everything else in the window is click-through. */
   setHitRects: (rects: HitRect[]) => call<void>("set_hit_rects", { rects }),

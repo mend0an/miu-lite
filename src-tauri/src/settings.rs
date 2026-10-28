@@ -4,6 +4,14 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::collections::BTreeMap;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ProviderProfile {
+    pub model: String,
+    pub base_url: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -13,9 +21,12 @@ pub struct Settings {
     /// "primary" = the main display, "cursor" = whichever display the mouse is on.
     pub screen: String,
     pub autostart: bool,
-    /// Gemini API base URL. Empty = Google's default endpoint.
+    pub provider: String,
+    pub provider_profiles: BTreeMap<String, ProviderProfile>,
+    pub web_search: bool,
+    /// Active provider's API base URL; empty uses that provider's default.
     pub llm_base_url: String,
-    /// Gemini model ID, e.g. "gemini-3.6-flash". Empty until the user picks one.
+    /// Active provider model ID. Empty until the user picks one.
     pub model: String,
     /// Character size multiplier, 0.8–1.4.
     pub character_scale: f64,
@@ -26,7 +37,7 @@ pub struct Settings {
     /// Miu keeps facts about the user (memory.json) and gets the tools to
     /// save and forget them.
     pub memory_enabled: bool,
-    /// Finished conversations are summarised into facts (costs a Gemini call).
+    /// Finished conversations are summarised into facts (uses the selected model).
     pub auto_summary: bool,
     /// The conversation is saved (chat.json) and comes back after a restart.
     pub keep_chat: bool,
@@ -50,6 +61,9 @@ impl Default for Settings {
             sound_volume: 0.12,
             screen: "primary".into(),
             autostart: false,
+            provider: "gemini".into(),
+            provider_profiles: BTreeMap::new(),
+            web_search: true,
             llm_base_url: String::new(),
             model: String::new(),
             character_scale: 1.0,
@@ -83,6 +97,19 @@ pub fn load() -> Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn provider_profiles_and_legacy_gemini_settings_survive() {
+        let old:Settings = serde_json::from_str(r#"{"model":"existing-gemini","llmBaseUrl":"https://proxy.example/v1beta"}"#).unwrap();
+        assert_eq!(old.provider,"gemini");
+        assert!(old.web_search);
+        assert_eq!(old.model,"existing-gemini");
+        assert_eq!(old.llm_base_url,"https://proxy.example/v1beta");
+        let mut current=old;
+        current.provider_profiles.insert("ollama".into(),ProviderProfile{model:"local:small".into(),base_url:"http://127.0.0.1:11434".into()});
+        let restored:Settings=serde_json::from_str(&serde_json::to_string(&current).unwrap()).unwrap();
+        assert_eq!(restored.provider_profiles["ollama"].model,"local:small");
+    }
+
 
     #[test]
     fn partial_settings_keep_defaults_and_round_trip_preferences() {

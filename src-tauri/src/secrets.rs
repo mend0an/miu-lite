@@ -8,7 +8,7 @@ use keyring::Entry;
 const SERVICE: &str = "miu-lite";
 
 /// Every key the app may store. Anything outside this list is refused.
-pub const KNOWN_KEYS: &[&str] = &[crate::llm::GEMINI_KEY];
+pub const KNOWN_KEYS: &[&str] = &[crate::llm::GEMINI_KEY, "openai-api-key", "claude-api-key", "ollama-api-key", "ollama-search-key"];
 
 fn entry(key: &str) -> Option<Entry> {
     if !KNOWN_KEYS.contains(&key) {

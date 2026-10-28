@@ -4,7 +4,6 @@
 
 import {
   Bridge,
-  GEMINI_KEY,
   IS_TAURI,
   onEvent,
   type ChatEvent,
@@ -15,7 +14,7 @@ import {
 } from "../core/bridge";
 import { STATE_LABEL, type BotStateName } from "../core/layout";
 import { Sound } from "../core/sound";
-import { DEFAULT_SETTINGS, type Settings } from "../core/state";
+import { DEFAULT_SETTINGS, PROVIDERS, type Settings } from "../core/state";
 import type { CharacterEmote, CharacterRenderer } from "../character/renderer";
 import { MiuRenderer } from "../character/miu";
 import { h, clear, svg } from "../views/dom";
@@ -71,6 +70,7 @@ export class Widget {
   private settings: Settings = { ...DEFAULT_SETTINGS };
   private renderer: CharacterRenderer = new MiuRenderer();
   private hasKey = false;
+  private searching = false;
 
   // DOM
   private panel: HTMLElement;
@@ -207,7 +207,10 @@ export class Widget {
     this.hasKey = await this.llmReady();
     this.applySettings();
     // The conversation from before the last exit (chat.json).
-    for (const t of (await Bridge.chatHistory()) ?? []) this.addBubble(t.user ? "user" : "model", t.text);
+    for (const t of (await Bridge.chatHistory()) ?? []) {
+      this.addBubble(t.user ? "user" : "model", t.text);
+      if (!t.user && t.suggestions) this.addSuggestions(t.suggestions);
+    }
 
     await onEvent<{ x: number; y: number }>("cursor", ({ x, y }) => this.onCursor(x, y));
     await onEvent<ChatEvent>("chat", (e) => this.onChat(e));
@@ -340,7 +343,7 @@ export class Widget {
 
   /** The Gemini key is saved. */
   private async llmReady(): Promise<boolean> {
-    return (await Bridge.secretPresent(GEMINI_KEY)) ?? false;
+    return this.settings.provider === "ollama" || ((await Bridge.secretPresent(PROVIDERS[this.settings.provider].key)) ?? false);
   }
 
   private modelReady(): boolean {
@@ -584,7 +587,7 @@ export class Widget {
     if (now < this.dizzyUntil) return "dizzy";
     if (this.filePhase === "confirm") return "approval";
     if (this.filePhase === "copying") return "working";
-    if (this.chatPhase !== "idle") return "thinking";
+    if (this.chatPhase !== "idle") return this.searching ? "searching" : "thinking";
     if (this.alert) return this.alert;
     if (now < this.celebrateUntil) return "finished";
     if (this.sleeping) return "sleeping";
@@ -642,7 +645,7 @@ export class Widget {
   private updateSubtitle() {
     const model = this.settings.model || "model belum dipilih";
     const text = this.statusText.textContent || STATE_LABEL[this.effectiveState()];
-    this.subtitle.textContent = `Gemini · ${model}${text ? ` · ${text}` : ""}`;
+    this.subtitle.textContent = `${PROVIDERS[this.settings.provider].label} · ${model}${text ? ` · ${text}` : ""}`;
   }
 
   private celebrate() {
@@ -929,7 +932,7 @@ export class Widget {
           "div",
           { class: "note warn" },
           h("span", {
-            text: !this.hasKey ? "Isi API key Gemini dulu, lalu pilih model." : "Pilih model Gemini dulu.",
+            text: !this.hasKey ? "Isi API key penyedia dulu, lalu pilih model." : "Pilih model dulu.",
           }),
           h("button", { text: "Buka Pengaturan", onclick: () => void Bridge.openSettingsWindow() }),
         ),
@@ -942,8 +945,33 @@ export class Widget {
     this.messages.querySelector(".empty")?.remove();
     const el = h("div", { class: `bubble ${role}`, text });
     this.messages.append(el);
+    this.linkifyAnswers();
     this.scrollToEnd();
     return el;
+  }
+
+  private addSuggestions(html: string) {
+        const frame = h("iframe", { title: "Saran pencarian Google", sandbox: "allow-popups allow-popups-to-escape-sandbox", style: "width:100%;height:120px;border:0;background:white;border-radius:8px" });
+        frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src https: data:">${html}`;
+        this.messages.append(frame);
+        this.scrollToEnd();
+  }
+
+  private linkifyAnswers() {
+    for (const bubble of this.messages.querySelectorAll<HTMLElement>(".bubble.model")) {
+      if (bubble.querySelector("a")) continue;
+      const text = bubble.textContent || "";
+      clear(bubble);
+      let at = 0;
+      for (const match of text.matchAll(/https?:\/\/[^\s<>]+/g)) {
+        const url = match[0].replace(/[),.;]+$/, "");
+        const index = match.index!;
+        bubble.append(document.createTextNode(text.slice(at, index)));
+        bubble.append(h("a", { href: url, text: url, style: "color:inherit;text-decoration:underline;overflow-wrap:anywhere", onclick: (event: Event) => { event.preventDefault(); void Bridge.openUrl(url); } }));
+        at = index + url.length;
+      }
+      bubble.append(document.createTextNode(text.slice(at)));
+    }
   }
 
   private addNote(text: string, kind: "info" | "tool" | "warn" | "err" = "info", withSettings = false): HTMLElement {
@@ -1003,6 +1031,7 @@ export class Widget {
     if (this.chatPhase !== "idle") void Bridge.chatStop();
     void Bridge.chatReset();
     this.chatPhase = "idle";
+    this.searching = false;
     this.activeRequest = null;
     this.answerEl = null;
     this.alert = null;
@@ -1026,7 +1055,19 @@ export class Widget {
     if (e.requestId !== this.activeRequest) return;
 
     switch (e.kind) {
+      case "search":
+        if (this.chatPhase === "stopping") return;
+        this.searching = true;
+        this.refreshState();
+        this.addNote(e.text, "tool");
+        return;
+      case "suggestions": {
+        if (this.chatPhase === "stopping") return;
+        this.addSuggestions(e.text);
+        return;
+      }
       case "delta": {
+        this.searching = false;
         if (this.chatPhase === "stopping") return;
         if (this.chatPhase === "waiting") {
           this.chatPhase = "streaming";
@@ -1044,6 +1085,7 @@ export class Widget {
         this.answerEl = null;
         return;
       case "done":
+        this.linkifyAnswers();
         if (e.text) this.addNote(e.text, "info");
         this.renderer.playEmote("happy");
         Sound.play("pop");
@@ -1056,6 +1098,7 @@ export class Widget {
         this.addNote(e.text, "err", e.code === "key" || e.code === "model");
         break;
     }
+    this.searching = false;
     this.activeRequest = null;
     this.answerEl = null;
     this.chatPhase = "idle";

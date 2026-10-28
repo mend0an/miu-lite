@@ -204,6 +204,9 @@ pub async fn stream(
             "systemInstruction": { "parts": [{ "text": system }] },
             "contents": contents,
         });
+        if p.web_search {
+            body["tools"] = json!([{ "google_search": {} }]);
+        }
         if !tools.is_empty() {
             body["tools"] = json!([{ "functionDeclarations": tools }]);
             // Out of rounds: the tools stay declared (the history has calls)
@@ -217,7 +220,15 @@ pub async fn stream(
             Err(outcome) => return outcome,
         };
         if r.calls.is_empty() {
-            return finish(text, r.finish.as_deref());
+            let extra = crate::providers::source_text(&r.sources);
+            if !extra.is_empty() {
+                text.push_str(&extra);
+                emit(app,id,"delta",extra,None);
+            }
+            if p.web_search && r.sources.is_empty() {
+                emit(app,id,"tool","Google Search tidak mengembalikan sumber; informasi ini belum terverifikasi dari web.".into(),None);
+            }
+            return finish(text, r.finish.as_deref(), r.suggestions);
         }
 
         // Send the model's turn back exactly as it came (thought signatures
@@ -246,21 +257,24 @@ pub async fn stream(
     Outcome::Failed(failure("other", "Gemini terus memanggil alat tanpa menjawab."))
 }
 
-fn finish(text: String, reason: Option<&str>) -> Outcome {
+fn finish(text: String, reason: Option<&str>, suggestions:Option<String>) -> Outcome {
     let text = text.trim_end().to_string();
     match reason {
         Some("SAFETY" | "PROHIBITED_CONTENT" | "BLOCKLIST" | "SPII" | "RECITATION") if text.is_empty() => {
             Outcome::Failed(failure("blocked", "Gemini menolak menjawab permintaan ini."))
         }
-        Some("MAX_TOKENS") => Outcome::Done { text, note: Some("Jawaban terpotong karena batas panjang.".into()) },
+        Some("MAX_TOKENS") => Outcome::Done { text, note: Some("Jawaban terpotong karena batas panjang.".into()), suggestions },
         _ if text.is_empty() => Outcome::Failed(failure("other", "Gemini tidak mengirim jawaban.")),
-        _ => Outcome::Done { text, note: None },
+        _ => Outcome::Done { text, note: None, suggestions },
     }
 }
 
 /// What one streamed request produced besides the text.
 #[derive(Default)]
 struct Round {
+    suggestions: Option<String>,
+    sources: Vec<(String,String)>,
+    search_started: bool,
     /// Every part of the model's content, to send back with the call results.
     parts: Vec<Value>,
     /// `functionCall` objects, in order.
@@ -331,12 +345,15 @@ async fn stream_request(
     if cancelled.load(Ordering::SeqCst) {
         return Err(Outcome::Stopped { text: text.clone() });
     }
+    if round.finish.is_none() {
+        return Err(Outcome::Failed(failure("network", "Stream Gemini terputus sebelum jawaban selesai.")));
+    }
     Ok(round)
 }
 
 /// One SSE event's data: a GenerateContentResponse.
 fn handle_event(app: &AppHandle, id: u64, data: &str, text: &mut String, round: &mut Round) -> Result<(), Failure> {
-    let Ok(v) = serde_json::from_str::<Value>(data) else { return Ok(()) };
+    let v: Value = serde_json::from_str(data).map_err(|_| failure("server", "Format stream Gemini tidak valid."))?;
     if let Some(err) = v.get("error") {
         let message = err.get("message").and_then(Value::as_str).unwrap_or("kesalahan tidak dikenal");
         return Err(failure("server", format!("Gemini: {message}")));
@@ -345,6 +362,19 @@ fn handle_event(app: &AppHandle, id: u64, data: &str, text: &mut String, round: 
         return Err(failure("blocked", format!("Gemini menolak permintaan ini ({block}).")));
     }
     let candidate = v.get("candidates").and_then(Value::as_array).and_then(|c| c.first());
+    if let Some(metadata) = candidate.and_then(|c| c.get("groundingMetadata")) {
+        crate::providers::sources(&metadata["groundingChunks"],&mut round.sources);
+        if !round.search_started && (metadata.get("webSearchQueries").is_some() || !round.sources.is_empty()) {
+            round.search_started = true;
+            emit(app,id,"search","Mencari web…".into(),None);
+        }
+        if let Some(html) = metadata.pointer("/searchEntryPoint/renderedContent").and_then(Value::as_str) {
+            if round.suggestions.as_deref() != Some(html) {
+                round.suggestions = Some(html.to_owned());
+                emit(app,id,"suggestions",html.to_owned(),None);
+            }
+        }
+    }
     let parts = candidate.and_then(|c| c.get("content")).and_then(|c| c.get("parts")).and_then(Value::as_array);
     for part in parts.into_iter().flatten() {
         round.parts.push(part.clone());

@@ -3,8 +3,9 @@
 // can store or remove it, and ask whether it exists, but never read it back.
 
 import "./settings.css";
-import { Bridge, GEMINI_KEY, onEvent, type Fact, type ModelInfo } from "../core/bridge";
-import { DEFAULT_SETTINGS, GEMINI_DEFAULT_BASE, type Settings } from "../core/state";
+import { llmSection } from "./llm";
+import { Bridge, onEvent, type Fact } from "../core/bridge";
+import { DEFAULT_SETTINGS, type Settings } from "../core/state";
 import { h, clear } from "../views/dom";
 
 let settings: Settings = { ...DEFAULT_SETTINGS };
@@ -33,9 +34,6 @@ function toggle(on: boolean, onChange: (v: boolean) => void): HTMLElement {
   return el;
 }
 
-function statusDot(ok: boolean): HTMLElement {
-  return h("i", { class: "dot", style: `background:${ok ? "#22c55e" : "#f4505e"}` });
-}
 
 function notice(kind: "ok" | "err" | "warn", text: string): HTMLElement {
   return h("div", { class: `notice ${kind}`, text });
@@ -43,213 +41,6 @@ function notice(kind: "ok" | "err" | "warn", text: string): HTMLElement {
 
 // ── Gemini ────────────────────────────────────────────────────────────────────
 
-function geminiSection(hasKeyAtStart: boolean): HTMLElement {
-  let models: ModelInfo[] = [];
-  let hasKey = hasKeyAtStart;
-
-  const dot = statusDot(false);
-  const state = h("div", { class: "hint" });
-
-  const keyField = h("input", {
-    type: "password",
-    autocomplete: "off",
-    spellcheck: "false",
-    style: "flex:1 1 auto;min-width:0",
-  }) as HTMLInputElement;
-  const saveKey = h("button", { class: "primary", text: "Simpan key" });
-  const clearKey = h("button", { class: "danger", text: "Hapus" });
-
-  const modelSelect = h("select", { style: "flex:1 1 auto;min-width:0" }) as HTMLSelectElement;
-  const reload = h("button", { text: "Muat daftar" });
-  const manual = h("input", {
-    type: "text",
-    autocomplete: "off",
-    spellcheck: "false",
-    placeholder: "mis. gemini-3.6-flash",
-    style: "flex:1 1 auto;min-width:0",
-  }) as HTMLInputElement;
-  const useManual = h("button", { text: "Pakai" });
-
-  const baseUrl = h("input", {
-    type: "text",
-    autocomplete: "off",
-    spellcheck: "false",
-    placeholder: GEMINI_DEFAULT_BASE,
-    style: "flex:1 1 auto;min-width:0",
-  }) as HTMLInputElement;
-  const saveUrl = h("button", { text: "Simpan URL" });
-
-  const testBtn = h("button", { class: "primary", text: "Tes koneksi" });
-  const feedback = h("div", {});
-
-  function ready(): boolean {
-    return hasKey && !!settings.model;
-  }
-
-  function refresh() {
-    keyField.placeholder = hasKey ? "••••••••••••  (tersimpan)" : "Tempel API key Gemini";
-    clearKey.style.display = hasKey ? "" : "none";
-    baseUrl.value = settings.llmBaseUrl || GEMINI_DEFAULT_BASE;
-    dot.style.background = ready() ? "#22c55e" : "#f4505e";
-    state.textContent = ready()
-      ? `Aktif: Google Gemini · model ${settings.model}.`
-      : !hasKey
-        ? "Isi API key Gemini, lalu pilih model."
-        : "Pilih model.";
-    testBtn.toggleAttribute("disabled", !ready());
-  }
-
-  function fillSelect() {
-    clear(modelSelect);
-    modelSelect.append(h("option", { value: "", text: models.length ? "— pilih model —" : "— muat daftar dulu —" }));
-    const featured = models.filter((m) => m.featured);
-    const rest = models.filter((m) => !m.featured);
-    const group = (label: string, list: ModelInfo[]) => {
-      if (!list.length) return;
-      const g = h("optgroup", { label });
-      for (const m of list) {
-        g.append(h("option", { value: m.id, text: m.displayName === m.id ? m.id : `${m.displayName} (${m.id})` }));
-      }
-      modelSelect.append(g);
-    };
-    if (featured.length) {
-      group("Flash", featured);
-      group("Model lain", rest);
-    } else {
-      group("Model", rest);
-    }
-    if (settings.model && !models.some((m) => m.id === settings.model)) {
-      modelSelect.append(h("option", { value: settings.model, text: `${settings.model} (manual)` }));
-    }
-    modelSelect.value = settings.model;
-  }
-
-  async function loadModels() {
-    clear(feedback);
-    reload.setAttribute("disabled", "");
-    reload.textContent = "Memuat…";
-    try {
-      models = await Bridge.llmModels();
-      fillSelect();
-      if (!models.length) feedback.append(notice("warn", "Gemini tidak memberi daftar model. Ketik ID model di bawah."));
-    } catch (err) {
-      models = [];
-      fillSelect();
-      feedback.append(notice("err", errText(err)));
-    } finally {
-      reload.removeAttribute("disabled");
-      reload.textContent = "Muat daftar";
-      refresh();
-    }
-  }
-
-  async function setModel(id: string) {
-    settings.model = id;
-    await save();
-    fillSelect();
-    refresh();
-  }
-
-  saveKey.addEventListener("click", async () => {
-    const value = keyField.value.trim();
-    if (!value) return;
-    clear(feedback);
-    try {
-      await Bridge.secretSet(GEMINI_KEY, value);
-      keyField.value = "";
-      hasKey = (await Bridge.secretPresent(GEMINI_KEY)) ?? false;
-      feedback.append(notice("ok", "Key disimpan di Windows Credential Manager."));
-      refresh();
-      // Tells the widget a key now exists (it re-checks on settings-changed).
-      await save();
-      await loadModels();
-    } catch (err) {
-      feedback.append(notice("err", `Gagal menyimpan: ${errText(err)}`));
-    }
-  });
-
-  clearKey.addEventListener("click", async () => {
-    clear(feedback);
-    try {
-      await Bridge.secretClear(GEMINI_KEY);
-      hasKey = false;
-      feedback.append(notice("ok", "Key dihapus."));
-      refresh();
-      await save();
-    } catch (err) {
-      feedback.append(notice("err", `Gagal menghapus: ${errText(err)}`));
-    }
-  });
-
-  modelSelect.addEventListener("change", () => {
-    if (modelSelect.value) void setModel(modelSelect.value);
-  });
-
-  useManual.addEventListener("click", () => {
-    const id = manual.value.trim().replace(/^models\//, "");
-    clear(feedback);
-    if (!/^[A-Za-z0-9._-]{1,100}$/.test(id)) {
-      feedback.append(notice("err", "ID model tidak valid."));
-      return;
-    }
-    manual.value = "";
-    void setModel(id).then(() => feedback.append(notice("ok", `Model diganti ke ${id}. Tekan Tes koneksi untuk memastikan.`)));
-  });
-
-  saveUrl.addEventListener("click", async () => {
-    clear(feedback);
-    const raw = baseUrl.value.trim();
-    try {
-      settings.llmBaseUrl = !raw || raw === GEMINI_DEFAULT_BASE ? "" : await Bridge.llmCheckUrl(raw);
-      await save();
-      feedback.append(notice("ok", "URL disimpan."));
-      refresh();
-      if (hasKey) await loadModels();
-    } catch (err) {
-      feedback.append(notice("err", errText(err)));
-    }
-  });
-
-  reload.addEventListener("click", () => void loadModels());
-
-  testBtn.addEventListener("click", async () => {
-    clear(feedback);
-    testBtn.setAttribute("disabled", "");
-    testBtn.textContent = "Menguji…";
-    try {
-      feedback.append(notice("ok", await Bridge.llmTest()));
-    } catch (err) {
-      feedback.append(notice("err", errText(err)));
-    } finally {
-      testBtn.textContent = "Tes koneksi";
-      refresh();
-    }
-  });
-
-  fillSelect();
-  refresh();
-  if (hasKey) void loadModels();
-
-  return h(
-    "section",
-    {},
-    h("h2", {}, dot, h("span", { text: "Google Gemini" })),
-    state,
-    h("div", { class: "row" }, h("label", { text: "API key" }), keyField, saveKey, clearKey),
-    h("div", { class: "row" }, h("label", { text: "Model" }), modelSelect, reload),
-    h("div", { class: "row" }, h("label", { text: "ID manual" }), manual, useManual),
-    h("div", { class: "row" }, h("label", { text: "URL API" }), baseUrl, saveUrl),
-    h("div", { class: "row" }, h("label", { text: "" }), testBtn),
-    h("div", {
-      class: "hint",
-      text: "API key gratis dari aistudio.google.com. Key disimpan di Windows Credential Manager PC ini, " +
-        "jadi di PC lain perlu diisi lagi. URL API biarkan default kecuali memakai proxy.",
-    }),
-    feedback,
-  );
-}
-
-// ── Character and general ─────────────────────────────────────────────────────
 
 function generalSection(): HTMLElement {
   const volume = h("input", {
@@ -489,24 +280,23 @@ async function main() {
     version = boot.version;
     dropRoot = boot.dropRoot;
   }
-  const hasKey = (await Bridge.secretPresent(GEMINI_KEY)) ?? false;
 
   clear(root);
   root.append(
     h("h1", {}, h("span", { text: "Miu Lite" }), h("span", { class: "version", text: version })),
-    geminiSection(hasKey),
+    llmSection(() => settings, save),
     memorySection(),
     generalSection(),
     filesSection(),
     aboutSection(),
     h("div", {
       class: "hint",
-      text: "Tanpa telemetri. Permintaan jaringan hanya ke Google Gemini (chat dan ringkasan ingatan).",
+      text: "Tanpa telemetri. Chat dan ringkasan menggunakan penyedia pilihanmu; pencarian web memakai layanan penyedia atau Ollama Web Search.",
     }),
   );
 
   void onEvent<Settings>("settings-changed", (s) => {
-    settings = { ...settings, ...s };
+    Object.assign(settings, s);
   });
   // Gemini saved or forgot a fact, a summary added some, or a click here.
   void onEvent<null>("memory-changed", () => void reloadFacts());

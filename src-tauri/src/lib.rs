@@ -5,6 +5,7 @@
 
 mod files;
 mod gemini;
+mod providers;
 mod llm;
 mod log;
 mod media;
@@ -58,7 +59,8 @@ fn boot(app: AppHandle, shared: State<Shared>) -> BootInfo {
 }
 
 #[tauri::command]
-fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
+fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) -> Result<(), String> {
+    settings::save(&settings).map_err(|e| format!("Gagal menyimpan pengaturan: {e}"))?;
     let (screen_changed, autostart_changed) = {
         let mut current = shared.settings.lock().unwrap();
         let screen_changed = current.screen != settings.screen;
@@ -71,9 +73,6 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         memory::save_chat(&[]);
     }
     files::set_root(&settings.drop_root);
-    if let Err(err) = settings::save(&settings) {
-        log::line(format!("could not save settings: {err}"));
-    }
     if autostart_changed {
         let manager = app.autolaunch();
         let result = if settings.autostart { manager.enable() } else { manager.disable() };
@@ -86,6 +85,7 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
     }
     // Keep the other window in step (widget ⇄ settings window).
     let _ = app.emit("settings-changed", settings);
+    Ok(())
 }
 
 /// The page pushes the shapes that take the mouse; Rust decides click-through.
